@@ -165,7 +165,6 @@ with tab1:
             Structure response with bullet points.
             Avoid simplification.
             """
-
             user_prompt = f"""
             Patient Data:
             Age: {Age}
@@ -179,7 +178,6 @@ with tab1:
 
             Provide a technical cardiology-level explanation.
             """
-
         else:
             system_prompt = """
             You are a healthcare educator explaining results to a non-medical patient.
@@ -188,7 +186,6 @@ with tab1:
             Use short sentences.
             Be reassuring but realistic.
             """
-
             user_prompt = f"""
             The model predicted {risk_text}
             with {confidence:.2f}% confidence.
@@ -205,8 +202,58 @@ with tab1:
             ],
         )
 
+        explanation = response.choices[0].message.content
+
         st.markdown("## 🧠 AI Explanation")
-        st.write(response.choices[0].message.content)
+        st.write(explanation)
+
+        # ==========================================
+        # ✅ PDF DOWNLOAD RESTORED (ONLY ADDITION)
+        # ==========================================
+
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=letter)
+        elements = []
+        styles = getSampleStyleSheet()
+
+        elements.append(Paragraph("<b>Heart Failure Risk Assessment Report</b>", styles['Title']))
+        elements.append(Spacer(1, 20))
+
+        table_data = [
+            ["Parameter", "Value"],
+            ["Prediction", risk_text],
+            ["Confidence", f"{confidence:.2f}%"],
+            ["Age", Age],
+            ["Cholesterol (Adjusted)", adjusted_chol],
+            ["Resting Blood Pressure", RestingBP],
+            ["Max Heart Rate", MaxHR],
+            ["Oldpeak", Oldpeak],
+            ["ST Slope", ST_Slope],
+        ]
+
+        table = Table(table_data)
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.darkblue),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.whitesmoke),
+        ]))
+
+        elements.append(table)
+        elements.append(Spacer(1, 20))
+        elements.append(Paragraph("<b>AI Clinical Explanation:</b>", styles['Heading2']))
+        elements.append(Spacer(1, 10))
+        elements.append(Paragraph(explanation, styles['BodyText']))
+
+        doc.build(elements)
+        buffer.seek(0)
+
+        st.download_button(
+            label="📄 Download PDF Report",
+            data=buffer,
+            file_name="Heart_Failure_Risk_Report.pdf",
+            mime="application/pdf"
+        )
 
 # ==========================================
 # TAB 2 — ANALYTICS
