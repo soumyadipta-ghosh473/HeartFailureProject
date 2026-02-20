@@ -20,15 +20,24 @@ scaler = joblib.load("scaler.pkl")
 # =========================
 # Initialize Groq Client
 # =========================
-client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+
+if not GROQ_API_KEY:
+    st.error("Groq API key not set. Please run: set GROQ_API_KEY=your_key")
+    st.stop()
+
+client = Groq(api_key=GROQ_API_KEY)
 
 # =========================
-# UI
+# UI - Main Section
 # =========================
 st.title("Heart Failure Prediction with AI Clinical Explanation")
 st.write("Enter Patient Details")
+st.caption(f"Prompt Version: {PROMPT_VERSION}")
 
+# =========================
 # User Inputs
+# =========================
 Age = st.number_input("Age", 1, 120)
 Sex = st.number_input("Sex (0 = Female, 1 = Male)", 0, 1)
 ChestPainType = st.number_input("Chest Pain Type (encoded value)", 0, 3)
@@ -46,14 +55,12 @@ ST_Slope = st.number_input("ST Slope (encoded value)", 0, 2)
 # =========================
 if st.button("Predict"):
 
-    # Prepare input features
     features = np.array([[Age, Sex, ChestPainType, RestingBP,
                           Cholesterol, FastingBS, RestingECG,
                           MaxHR, ExerciseAngina, Oldpeak, ST_Slope]])
 
     features_scaled = scaler.transform(features)
 
-    # ML Prediction
     prediction = model.predict(features_scaled)
     probability = model.predict_proba(features_scaled)[0][1]
     confidence_percentage = probability * 100
@@ -65,14 +72,28 @@ if st.button("Predict"):
         risk_text = "Low Risk of Heart Failure"
         st.success(risk_text)
 
-    # Show confidence
     st.write(f"Model Confidence: {confidence_percentage:.2f}%")
 
     # =========================
     # Logging (Monitoring)
     # =========================
-    with open("prediction_logs.csv", mode="a", newline="") as file:
+    log_file = "prediction_logs.csv"
+    file_exists = os.path.isfile(log_file)
+
+    with open(log_file, mode="a", newline="") as file:
         writer = csv.writer(file)
+
+        if not file_exists:
+            writer.writerow([
+                "Timestamp",
+                "Prompt_Version",
+                "Age",
+                "Cholesterol",
+                "RestingBP",
+                "Prediction",
+                "Confidence_Percentage"
+            ])
+
         writer.writerow([
             datetime.datetime.now(),
             PROMPT_VERSION,
@@ -80,11 +101,11 @@ if st.button("Predict"):
             Cholesterol,
             RestingBP,
             risk_text,
-            confidence_percentage
+            round(confidence_percentage, 2)
         ])
 
     # =========================
-    # LLM Prompt
+    # LLM Explanation Prompt
     # =========================
     prompt = f"""
     Prompt Version: {PROMPT_VERSION}
@@ -115,6 +136,43 @@ if st.button("Predict"):
 
     except Exception as e:
         st.error(f"LLM Error: {str(e)}")
+
+
+# =========================
+# Sidebar Medical Chatbot
+# =========================
+with st.sidebar:
+    st.header("💬 Medical Assistant Chatbot")
+
+    user_question = st.text_input("Ask a medical question:")
+
+    if st.button("Ask"):
+
+        if user_question.strip() == "":
+            st.warning("Please enter a question.")
+        else:
+            chat_prompt = f"""
+            You are a medical assistant AI.
+
+            Provide clear, simple, educational information.
+            Do NOT provide medical diagnosis.
+            Avoid definitive treatment instructions.
+
+            Question: {user_question}
+            """
+
+            try:
+                chat_response = client.chat.completions.create(
+                    model="llama-3.3-70b-versatile",
+                    messages=[{"role": "user", "content": chat_prompt}],
+                )
+
+                answer = chat_response.choices[0].message.content
+                st.write(answer)
+
+            except Exception as e:
+                st.error(f"Chatbot Error: {str(e)}")
+
 
 # =========================
 # Disclaimer
