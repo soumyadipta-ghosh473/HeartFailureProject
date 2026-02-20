@@ -4,10 +4,14 @@ import numpy as np
 import os
 from groq import Groq
 import datetime
-import csv
 import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
+import io
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet
 
 # ==========================================
 # PAGE CONFIG
@@ -44,7 +48,7 @@ section[data-testid="stSidebar"] * {
 # ==========================================
 # SYSTEM INFO
 # ==========================================
-PROMPT_VERSION = "v11.0"
+PROMPT_VERSION = "v13.0"
 MODEL_VERSION = "HeartFailure-XGB-v1"
 LLM_MODEL = "llama-3.3-70b-versatile"
 
@@ -73,10 +77,10 @@ if not GROQ_API_KEY:
 client = Groq(api_key=GROQ_API_KEY)
 
 # ==========================================
-# SESSION LOG INIT
+# SESSION LOG STORAGE (CLOUD SAFE)
 # ==========================================
-if "session_logs" not in st.session_state:
-    st.session_state.session_logs = []
+if "logs" not in st.session_state:
+    st.session_state.logs = []
 
 # ==========================================
 # TABS
@@ -102,10 +106,9 @@ with tab1:
         RestingECG = st.number_input("Resting ECG (0–2)", 0, 2)
         MaxHR = st.number_input("Max Heart Rate")
         ExerciseAngina = st.number_input("Exercise Angina (0 or 1)", 0, 1)
-        Oldpeak = st.number_input("Oldpeak (ST Depression)")
+        Oldpeak = st.number_input("Oldpeak")
         ST_Slope = st.number_input("ST Slope (0–2)", 0, 2)
 
-    # What-If Simulation
     st.markdown("### 🔄 What-If Simulation")
     chol_increase = st.slider("Increase Cholesterol (%)", 0, 100, 0)
     adjusted_chol = Cholesterol * (1 + chol_increase / 100)
@@ -126,18 +129,14 @@ with tab1:
         st.metric("Prediction", risk_text)
         st.metric("Confidence", f"{confidence:.2f}%")
 
-        # Add to session log
-        st.session_state.session_logs.append(risk_text)
+        # Save to session logs (cloud-safe)
+        st.session_state.logs.append({
+            "Timestamp": datetime.datetime.now(),
+            "Prediction": risk_text,
+            "Confidence": confidence
+        })
 
-        # Write to CSV (safe append)
-        file_exists = os.path.isfile("prediction_logs.csv")
-        with open("prediction_logs.csv", "a", newline="") as f:
-            writer = csv.writer(f)
-            if not file_exists:
-                writer.writerow(["Timestamp", "Prediction", "Confidence"])
-            writer.writerow([datetime.datetime.now(), risk_text, confidence])
-
-        # Gauge Chart
+        # Gauge
         fig = go.Figure(go.Indicator(
             mode="gauge+number",
             value=confidence,
@@ -153,16 +152,12 @@ with tab1:
         ))
         st.plotly_chart(fig, use_container_width=True)
 
-        # LLM Explanation
-        if doctor_mode:
-            prompt = f"Provide technical medical reasoning for {risk_text} with confidence {confidence:.2f}%."
-        else:
-            prompt = f"Explain in simple patient-friendly language why the risk is {risk_text}."
-
+        # Explanation
+        prompt = f"Explain risk level {risk_text} with confidence {confidence:.2f}%."
         response = client.chat.completions.create(
             model=LLM_MODEL,
             messages=[
-                {"role": "system", "content": "You are a medical assistant. Only provide medical explanations."},
+                {"role": "system", "content": "Medical assistant only."},
                 {"role": "user", "content": prompt}
             ],
         )
@@ -170,63 +165,79 @@ with tab1:
         st.markdown("## 🧠 AI Explanation")
         st.write(response.choices[0].message.content)
 
+        # PDF
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=letter)
+        elements = []
+        styles = getSampleStyleSheet()
+
+        elements.append(Paragraph("<b>Heart Failure Risk Report</b>", styles['Title']))
+        elements.append(Spacer(1, 12))
+
+        table_data = [
+            ["Prediction", risk_text],
+            ["Confidence", f"{confidence:.2f}%"],
+            ["Age", Age],
+            ["Cholesterol", adjusted_chol],
+            ["Blood Pressure", RestingBP]
+        ]
+
+        table = Table(table_data)
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.darkblue),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+        ]))
+
+        elements.append(table)
+        doc.build(elements)
+        buffer.seek(0)
+
+        st.download_button(
+            label="📄 Download PDF Report",
+            data=buffer,
+            file_name="Heart_Failure_Report.pdf",
+            mime="application/pdf"
+        )
+
 # ==========================================
-# TAB 2 — ANALYTICS DASHBOARD
+# TAB 2 — ANALYTICS
 # ==========================================
 with tab2:
 
     st.subheader("📊 Risk Distribution")
 
-    high = 0
-    low = 0
+    if len(st.session_state.logs) > 0:
 
-    # Load CSV if exists
-    if os.path.exists("prediction_logs.csv"):
-        try:
-            df = pd.read_csv("prediction_logs.csv")
-            high += (df["Prediction"] == "High Risk").sum()
-            low += (df["Prediction"] == "Low Risk").sum()
-        except:
-            pass
+        df = pd.DataFrame(st.session_state.logs)
 
-    # Add session logs
-    for entry in st.session_state.session_logs:
-        if entry == "High Risk":
-            high += 1
-        elif entry == "Low Risk":
-            low += 1
+        high = (df["Prediction"] == "High Risk").sum()
+        low = (df["Prediction"] == "Low Risk").sum()
+        total = len(df)
 
-    total = high + low
+        st.metric("Total Predictions", total)
+        st.metric("High Risk %", round((high / total) * 100, 2))
 
-    st.metric("Total Predictions", total)
-    st.metric("High Risk %", round((high / total) * 100 if total > 0 else 0, 2))
+        fig = px.pie(
+            names=["High Risk", "Low Risk"],
+            values=[high, low],
+            color=["High Risk", "Low Risk"],
+            color_discrete_map={"High Risk": "red", "Low Risk": "green"}
+        )
 
-    pie_data = pd.DataFrame({
-        "Category": ["High Risk", "Low Risk"],
-        "Count": [high, low]
-    })
+        st.plotly_chart(fig, use_container_width=True)
 
-    fig = px.pie(
-        pie_data,
-        values="Count",
-        names="Category",
-        color="Category",
-        color_discrete_map={
-            "High Risk": "red",
-            "Low Risk": "green"
-        }
-    )
+        # Download logs dynamically
+        csv_data = df.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            "⬇ Download Prediction Logs",
+            csv_data,
+            "prediction_logs.csv",
+            "text/csv"
+        )
 
-    fig.update_traces(textinfo="percent+label")
-    fig.update_layout(
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)"
-    )
-
-    st.plotly_chart(fig, use_container_width=True)
-
-    if total == 0:
-        st.info("No predictions yet. Generate some in Risk Assessment tab.")
+    else:
+        st.info("No predictions yet.")
 
 # ==========================================
 # TAB 3 — SYSTEM INFO
@@ -234,38 +245,29 @@ with tab2:
 with tab3:
     st.markdown("""
     **System Architecture**
-
-    1. Machine Learning Risk Prediction  
-    2. LLM Clinical Explanation Layer  
-    3. What-If Simulation Engine  
-    4. Monitoring & Logging (CSV + Session)  
-    5. Streamlit Cloud Deployment  
+    1. ML Prediction  
+    2. LLM Explanation  
+    3. What-If Simulation  
+    4. In-Memory Logging (Cloud Safe)  
+    5. Streamlit Deployment  
     """)
 
 # ==========================================
-# SIDEBAR CHATBOT (MEDICAL ONLY)
+# SIDEBAR CHATBOT
 # ==========================================
 st.sidebar.title("💬 Clinical AI Assistant")
-
-MEDICAL_KEYWORDS = ["heart", "blood", "disease", "medical", "health", "cholesterol", "bp", "cardio"]
-
-def is_medical(q):
-    return any(k in q.lower() for k in MEDICAL_KEYWORDS)
 
 question = st.sidebar.text_input("Ask medical question")
 
 if st.sidebar.button("Ask"):
-    if not is_medical(question):
-        st.sidebar.error("Only medical-related questions allowed.")
-    else:
-        response = client.chat.completions.create(
-            model=LLM_MODEL,
-            messages=[
-                {"role": "system", "content": "You are a medical assistant. Only answer medical questions."},
-                {"role": "user", "content": question}
-            ],
-        )
-        st.sidebar.write(response.choices[0].message.content)
+    response = client.chat.completions.create(
+        model=LLM_MODEL,
+        messages=[
+            {"role": "system", "content": "Answer only medical-related questions."},
+            {"role": "user", "content": question}
+        ],
+    )
+    st.sidebar.write(response.choices[0].message.content)
 
 st.markdown("---")
 st.info("⚠ Educational use only.")
