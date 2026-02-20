@@ -48,7 +48,7 @@ section[data-testid="stSidebar"] * {
 # ==========================================
 # SYSTEM INFO
 # ==========================================
-PROMPT_VERSION = "v13.0"
+PROMPT_VERSION = "v14.0"
 MODEL_VERSION = "HeartFailure-XGB-v1"
 LLM_MODEL = "llama-3.3-70b-versatile"
 
@@ -77,7 +77,7 @@ if not GROQ_API_KEY:
 client = Groq(api_key=GROQ_API_KEY)
 
 # ==========================================
-# SESSION LOG STORAGE (CLOUD SAFE)
+# SESSION LOG STORAGE
 # ==========================================
 if "logs" not in st.session_state:
     st.session_state.logs = []
@@ -129,7 +129,7 @@ with tab1:
         st.metric("Prediction", risk_text)
         st.metric("Confidence", f"{confidence:.2f}%")
 
-        # Save to session logs (cloud-safe)
+        # Store log
         st.session_state.logs.append({
             "Timestamp": datetime.datetime.now(),
             "Prediction": risk_text,
@@ -152,53 +152,61 @@ with tab1:
         ))
         st.plotly_chart(fig, use_container_width=True)
 
-        # Explanation
-        prompt = f"Explain risk level {risk_text} with confidence {confidence:.2f}%."
+        # ==========================================
+        # DIFFERENT SYSTEM PROMPTS (REAL FIX)
+        # ==========================================
+
+        if doctor_mode:
+            system_prompt = """
+            You are a clinical cardiologist providing technical reasoning.
+            Use medical terminology.
+            Include pathophysiology explanation.
+            Mention risk factors explicitly.
+            Structure response with bullet points.
+            Avoid simplification.
+            """
+
+            user_prompt = f"""
+            Patient Data:
+            Age: {Age}
+            Cholesterol: {adjusted_chol}
+            Blood Pressure: {RestingBP}
+            Max HR: {MaxHR}
+            Oldpeak: {Oldpeak}
+
+            Model Prediction: {risk_text}
+            Confidence: {confidence:.2f}%
+
+            Provide a technical cardiology-level explanation.
+            """
+
+        else:
+            system_prompt = """
+            You are a healthcare educator explaining results to a non-medical patient.
+            Use simple language.
+            Avoid medical jargon.
+            Use short sentences.
+            Be reassuring but realistic.
+            """
+
+            user_prompt = f"""
+            The model predicted {risk_text}
+            with {confidence:.2f}% confidence.
+
+            Explain in very simple language
+            what this means and why it might happen.
+            """
+
         response = client.chat.completions.create(
             model=LLM_MODEL,
             messages=[
-                {"role": "system", "content": "Medical assistant only."},
-                {"role": "user", "content": prompt}
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
             ],
         )
 
         st.markdown("## 🧠 AI Explanation")
         st.write(response.choices[0].message.content)
-
-        # PDF
-        buffer = io.BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=letter)
-        elements = []
-        styles = getSampleStyleSheet()
-
-        elements.append(Paragraph("<b>Heart Failure Risk Report</b>", styles['Title']))
-        elements.append(Spacer(1, 12))
-
-        table_data = [
-            ["Prediction", risk_text],
-            ["Confidence", f"{confidence:.2f}%"],
-            ["Age", Age],
-            ["Cholesterol", adjusted_chol],
-            ["Blood Pressure", RestingBP]
-        ]
-
-        table = Table(table_data)
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.darkblue),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('GRID', (0, 0), (-1, -1), 1, colors.grey),
-        ]))
-
-        elements.append(table)
-        doc.build(elements)
-        buffer.seek(0)
-
-        st.download_button(
-            label="📄 Download PDF Report",
-            data=buffer,
-            file_name="Heart_Failure_Report.pdf",
-            mime="application/pdf"
-        )
 
 # ==========================================
 # TAB 2 — ANALYTICS
@@ -227,7 +235,6 @@ with tab2:
 
         st.plotly_chart(fig, use_container_width=True)
 
-        # Download logs dynamically
         csv_data = df.to_csv(index=False).encode('utf-8')
         st.download_button(
             "⬇ Download Prediction Logs",
@@ -246,9 +253,9 @@ with tab3:
     st.markdown("""
     **System Architecture**
     1. ML Prediction  
-    2. LLM Explanation  
+    2. LLM Explanation (Dual Mode)  
     3. What-If Simulation  
-    4. In-Memory Logging (Cloud Safe)  
+    4. Cloud-Safe Logging  
     5. Streamlit Deployment  
     """)
 
