@@ -8,7 +8,7 @@ import csv
 import pandas as pd
 
 # ==========================================
-# Page Configuration
+# PAGE CONFIG
 # ==========================================
 st.set_page_config(
     page_title="Heart Failure AI System",
@@ -17,28 +17,28 @@ st.set_page_config(
 )
 
 # ==========================================
-# CLEAN PROFESSIONAL MEDICAL THEME
+# PROFESSIONAL MEDICAL THEME
 # ==========================================
 st.markdown("""
 <style>
 
-/* Remove extra top padding */
+/* Remove top padding */
 .block-container {
     padding-top: 2rem;
 }
 
-/* Main App Gradient */
+/* Background Gradient */
 .stApp {
     background: linear-gradient(135deg, #1d4350, #2c5364);
     color: #f5f5f5;
 }
 
-/* Glass card effect */
+/* Glass Card */
 .block-container {
-    background: rgba(255,255,255,0.04);
+    background: rgba(255,255,255,0.05);
     padding: 2rem;
-    border-radius: 18px;
-    backdrop-filter: blur(14px);
+    border-radius: 20px;
+    backdrop-filter: blur(12px);
 }
 
 /* Buttons */
@@ -52,49 +52,43 @@ st.markdown("""
     border: none;
 }
 
-/* Sidebar Styling */
+/* Sidebar */
 section[data-testid="stSidebar"] {
     background: linear-gradient(180deg, #1e3c43, #2c7744);
-    color: white;
 }
 
-/* Sidebar text */
+/* Sidebar text white */
 section[data-testid="stSidebar"] * {
     color: white !important;
 }
 
-/* Fix metric color */
+/* Metric styling */
 [data-testid="stMetricValue"] {
     font-size: 28px;
     color: #00ffcc;
 }
 
-/* Remove weird line */
+/* Remove default horizontal lines */
 hr {
     border: none;
-}
-
-/* Header spacing */
-h1 {
-    margin-bottom: 0.5rem;
 }
 
 </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# Prompt Version
+# PROMPT VERSION
 # ==========================================
-PROMPT_VERSION = "v3.1"
+PROMPT_VERSION = "v4.0"
 
 # ==========================================
-# Load ML Model
+# LOAD MODEL
 # ==========================================
 model = joblib.load("heart_failure_model.pkl")
 scaler = joblib.load("scaler.pkl")
 
 # ==========================================
-# Groq Initialization
+# GROQ INITIALIZATION
 # ==========================================
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 
@@ -117,13 +111,12 @@ st.markdown("""
 
 This platform integrates **Machine Learning risk prediction**
 with **Large Language Model clinical reasoning**
-to support early identification of cardiovascular risk factors.
+to support early cardiovascular risk identification.
 
 Designed for educational and AI-healthcare research purposes.
 """)
 
 st.caption(f"Prompt Version: {PROMPT_VERSION}")
-
 st.markdown("### 📋 Patient Clinical Parameters")
 
 # ==========================================
@@ -171,11 +164,37 @@ if st.button("🔍 Predict Risk"):
     with colB:
         st.metric("Confidence", f"{confidence_percentage:.2f}%")
 
-    st.bar_chart(pd.DataFrame({
-        "Risk Probability (%)": [confidence_percentage]
-    }))
+    # ======================================
+    # PROFESSIONAL RISK VISUALIZATION
+    # ======================================
+    st.markdown("### 📊 Risk Probability Assessment")
 
-    # Logging
+    if confidence_percentage < 40:
+        bar_color = "#2ecc71"   # Green
+    elif confidence_percentage < 70:
+        bar_color = "#f1c40f"   # Yellow
+    else:
+        bar_color = "#e74c3c"   # Red
+
+    st.markdown(f"""
+    <div style="background-color:#2b3e50;
+                border-radius:20px;
+                padding:8px;">
+        <div style="background-color:{bar_color};
+                    width:{confidence_percentage}%;
+                    padding:12px;
+                    border-radius:15px;
+                    text-align:center;
+                    font-weight:bold;
+                    color:white;">
+            {confidence_percentage:.2f}% Risk Probability
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # ======================================
+    # LOGGING
+    # ======================================
     log_file = "prediction_logs.csv"
     file_exists = os.path.isfile(log_file)
 
@@ -203,7 +222,21 @@ if st.button("🔍 Predict Risk"):
             round(confidence_percentage, 2)
         ])
 
-    # LLM Explanation
+    # ======================================
+    # DOWNLOAD LOG BUTTON
+    # ======================================
+    if os.path.exists(log_file):
+        with open(log_file, "rb") as f:
+            st.download_button(
+                label="⬇ Download Prediction Logs",
+                data=f,
+                file_name="prediction_logs.csv",
+                mime="text/csv"
+            )
+
+    # ======================================
+    # LLM EXPLANATION
+    # ======================================
     prompt = f"""
     Prompt Version: {PROMPT_VERSION}
 
@@ -248,7 +281,7 @@ Educational medical assistant powered by LLMs.
 st.sidebar.success("LLMOps Enabled Deployment")
 
 st.sidebar.markdown(
-    "<div style='background: rgba(255,255,255,0.15); padding:10px; border-radius:10px;'>"
+    "<div style='background: rgba(255,255,255,0.2); padding:10px; border-radius:12px;'>"
     "<b>Developed by Soumyadipta Ghosh</b>"
     "</div>",
     unsafe_allow_html=True
