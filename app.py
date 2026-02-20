@@ -5,55 +5,151 @@ import os
 from groq import Groq
 import datetime
 import csv
+import pandas as pd
 
-# =========================
-# Prompt Version Control
-# =========================
-PROMPT_VERSION = "v1.0"
+# ==========================================
+# Page Configuration
+# ==========================================
+st.set_page_config(
+    page_title="Heart Failure AI System",
+    page_icon="❤️",
+    layout="wide"
+)
 
-# =========================
-# Load ML Model & Scaler
-# =========================
+# ==========================================
+# CLEAN PROFESSIONAL MEDICAL THEME
+# ==========================================
+st.markdown("""
+<style>
+
+/* Remove extra top padding */
+.block-container {
+    padding-top: 2rem;
+}
+
+/* Main App Gradient */
+.stApp {
+    background: linear-gradient(135deg, #1d4350, #2c5364);
+    color: #f5f5f5;
+}
+
+/* Glass card effect */
+.block-container {
+    background: rgba(255,255,255,0.04);
+    padding: 2rem;
+    border-radius: 18px;
+    backdrop-filter: blur(14px);
+}
+
+/* Buttons */
+.stButton>button {
+    background: linear-gradient(90deg, #ff416c, #ff4b2b);
+    color: white;
+    border-radius: 12px;
+    height: 3em;
+    width: 100%;
+    font-size: 18px;
+    border: none;
+}
+
+/* Sidebar Styling */
+section[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #1e3c43, #2c7744);
+    color: white;
+}
+
+/* Sidebar text */
+section[data-testid="stSidebar"] * {
+    color: white !important;
+}
+
+/* Fix metric color */
+[data-testid="stMetricValue"] {
+    font-size: 28px;
+    color: #00ffcc;
+}
+
+/* Remove weird line */
+hr {
+    border: none;
+}
+
+/* Header spacing */
+h1 {
+    margin-bottom: 0.5rem;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+# ==========================================
+# Prompt Version
+# ==========================================
+PROMPT_VERSION = "v3.1"
+
+# ==========================================
+# Load ML Model
+# ==========================================
 model = joblib.load("heart_failure_model.pkl")
 scaler = joblib.load("scaler.pkl")
 
-# =========================
-# Initialize Groq Client
-# =========================
+# ==========================================
+# Groq Initialization
+# ==========================================
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 
 if not GROQ_API_KEY:
-    st.error("Groq API key not set. Please run: set GROQ_API_KEY=your_key")
+    st.error("Groq API key not configured in Streamlit Secrets.")
     st.stop()
 
 client = Groq(api_key=GROQ_API_KEY)
 
-# =========================
-# UI - Main Section
-# =========================
-st.title("Heart Failure Prediction with AI Clinical Explanation")
-st.write("Enter Patient Details")
+# ==========================================
+# HEADER
+# ==========================================
+st.markdown("""
+# ❤️ AI-Powered Heart Failure Risk Assessment System
+### Hybrid ML + LLM Clinical Intelligence Platform
+""")
+
+st.markdown("""
+#### 🏥 Empowering Preventive Cardiology Through Artificial Intelligence
+
+This platform integrates **Machine Learning risk prediction**
+with **Large Language Model clinical reasoning**
+to support early identification of cardiovascular risk factors.
+
+Designed for educational and AI-healthcare research purposes.
+""")
+
 st.caption(f"Prompt Version: {PROMPT_VERSION}")
 
-# =========================
-# User Inputs
-# =========================
-Age = st.number_input("Age", 1, 120)
-Sex = st.number_input("Sex (0 = Female, 1 = Male)", 0, 1)
-ChestPainType = st.number_input("Chest Pain Type (encoded value)", 0, 3)
-RestingBP = st.number_input("Resting Blood Pressure")
-Cholesterol = st.number_input("Cholesterol")
-FastingBS = st.number_input("Fasting Blood Sugar (0 or 1)", 0, 1)
-RestingECG = st.number_input("Resting ECG (encoded value)", 0, 2)
-MaxHR = st.number_input("Max Heart Rate")
-ExerciseAngina = st.number_input("Exercise Angina (0 or 1)", 0, 1)
-Oldpeak = st.number_input("Oldpeak")
-ST_Slope = st.number_input("ST Slope (encoded value)", 0, 2)
+st.markdown("### 📋 Patient Clinical Parameters")
 
-# =========================
-# Prediction Block
-# =========================
-if st.button("Predict"):
+# ==========================================
+# INPUT LAYOUT
+# ==========================================
+col1, col2 = st.columns(2)
+
+with col1:
+    Age = st.number_input("Age", 1, 120)
+    Sex = st.number_input("Sex (0 = Female, 1 = Male)", 0, 1)
+    ChestPainType = st.number_input("Chest Pain Type", 0, 3)
+    RestingBP = st.number_input("Resting Blood Pressure")
+    Cholesterol = st.number_input("Cholesterol")
+
+with col2:
+    FastingBS = st.number_input("Fasting Blood Sugar", 0, 1)
+    RestingECG = st.number_input("Resting ECG", 0, 2)
+    MaxHR = st.number_input("Max Heart Rate")
+    ExerciseAngina = st.number_input("Exercise Angina", 0, 1)
+    Oldpeak = st.number_input("Oldpeak")
+    ST_Slope = st.number_input("ST Slope", 0, 2)
+
+# ==========================================
+# PREDICTION
+# ==========================================
+if st.button("🔍 Predict Risk"):
 
     features = np.array([[Age, Sex, ChestPainType, RestingBP,
                           Cholesterol, FastingBS, RestingECG,
@@ -65,18 +161,21 @@ if st.button("Predict"):
     probability = model.predict_proba(features_scaled)[0][1]
     confidence_percentage = probability * 100
 
-    if prediction[0] == 1:
-        risk_text = "High Risk of Heart Failure"
-        st.error(risk_text)
-    else:
-        risk_text = "Low Risk of Heart Failure"
-        st.success(risk_text)
+    risk_text = "High Risk of Heart Failure" if prediction[0] == 1 else "Low Risk of Heart Failure"
 
-    st.write(f"Model Confidence: {confidence_percentage:.2f}%")
+    colA, colB = st.columns(2)
 
-    # =========================
-    # Logging (Monitoring)
-    # =========================
+    with colA:
+        st.metric("Prediction", risk_text)
+
+    with colB:
+        st.metric("Confidence", f"{confidence_percentage:.2f}%")
+
+    st.bar_chart(pd.DataFrame({
+        "Risk Probability (%)": [confidence_percentage]
+    }))
+
+    # Logging
     log_file = "prediction_logs.csv"
     file_exists = os.path.isfile(log_file)
 
@@ -91,7 +190,7 @@ if st.button("Predict"):
                 "Cholesterol",
                 "RestingBP",
                 "Prediction",
-                "Confidence_Percentage"
+                "Confidence"
             ])
 
         writer.writerow([
@@ -104,23 +203,21 @@ if st.button("Predict"):
             round(confidence_percentage, 2)
         ])
 
-    # =========================
-    # LLM Explanation Prompt
-    # =========================
+    # LLM Explanation
     prompt = f"""
     Prompt Version: {PROMPT_VERSION}
 
-    A patient has the following medical details:
+    Patient details:
     Age: {Age}
     Cholesterol: {Cholesterol}
     Blood Pressure: {RestingBP}
     Maximum Heart Rate: {MaxHR}
     Exercise Angina: {ExerciseAngina}
 
-    The machine learning model predicted: {risk_text}
-    with a confidence of {confidence_percentage:.2f}%.
+    Prediction: {risk_text}
+    Confidence: {confidence_percentage:.2f}%
 
-    Explain in simple medical language why this risk level may occur.
+    Explain in simple medical language.
     """
 
     try:
@@ -131,50 +228,63 @@ if st.button("Predict"):
 
         explanation = response.choices[0].message.content
 
-        st.subheader("AI Clinical Explanation")
+        st.markdown("## 🧠 AI Clinical Risk Interpretation")
         st.write(explanation)
 
     except Exception as e:
         st.error(f"LLM Error: {str(e)}")
 
+# ==========================================
+# SIDEBAR
+# ==========================================
+st.sidebar.title("🏥 Clinical AI Assistant")
 
-# =========================
-# Sidebar Medical Chatbot
-# =========================
-with st.sidebar:
-    st.header("💬 Medical Assistant Chatbot")
+st.sidebar.markdown("""
+Educational medical assistant powered by LLMs.
 
-    user_question = st.text_input("Ask a medical question:")
+⚠ Not a replacement for professional medical care.
+""")
 
-    if st.button("Ask"):
+st.sidebar.success("LLMOps Enabled Deployment")
 
-        if user_question.strip() == "":
-            st.warning("Please enter a question.")
-        else:
-            chat_prompt = f"""
-            You are a medical assistant AI.
+st.sidebar.markdown(
+    "<div style='background: rgba(255,255,255,0.15); padding:10px; border-radius:10px;'>"
+    "<b>Developed by Soumyadipta Ghosh</b>"
+    "</div>",
+    unsafe_allow_html=True
+)
 
-            Provide clear, simple, educational information.
-            Do NOT provide medical diagnosis.
-            Avoid definitive treatment instructions.
+st.sidebar.markdown("---")
+st.sidebar.subheader("💬 Ask Medical Questions")
 
-            Question: {user_question}
-            """
+user_question = st.sidebar.text_input("Enter your question:")
 
-            try:
-                chat_response = client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",
-                    messages=[{"role": "user", "content": chat_prompt}],
-                )
+if st.sidebar.button("Ask AI"):
 
-                answer = chat_response.choices[0].message.content
-                st.write(answer)
+    if user_question.strip():
+        chat_prompt = f"""
+        You are a medical assistant AI.
+        Provide educational information only.
+        No diagnosis or treatment advice.
 
-            except Exception as e:
-                st.error(f"Chatbot Error: {str(e)}")
+        Question: {user_question}
+        """
 
+        try:
+            chat_response = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[{"role": "user", "content": chat_prompt}],
+            )
 
-# =========================
-# Disclaimer
-# =========================
+            st.sidebar.write(chat_response.choices[0].message.content)
+
+        except Exception as e:
+            st.sidebar.error(f"Chatbot Error: {str(e)}")
+    else:
+        st.sidebar.warning("Please enter a question.")
+
+# ==========================================
+# DISCLAIMER
+# ==========================================
+st.markdown("---")
 st.info("⚠ This system is for educational purposes only and not a substitute for professional medical diagnosis.")
