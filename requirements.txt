@@ -1,9 +1,8 @@
 streamlit
-scikit-learn
-pandas
-numpy
 joblib
-xgboost
+numpy
 groq
+pandas
 plotly
 reportlab
+scikit-learn

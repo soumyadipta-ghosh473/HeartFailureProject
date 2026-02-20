@@ -1,48 +1,94 @@
-\# Heart Failure Prediction with LLM-Based Clinical Explanation
+\# ❤️ AI-Powered Heart Failure Risk Assessment Platform
 
 
 
-\## Overview
-
-This project implements a hybrid ML + LLM pipeline for heart failure risk prediction.
+\## 🚀 Hybrid ML + LLM Clinical Intelligence System
 
 
 
-\### Architecture
-
-1\. Machine Learning Model (XGBoost) predicts risk
-
-2\. Large Language Model (Groq - Llama 3.3 70B Versatile) generates clinical explanation
-
-3\. Streamlit provides interactive interface
-
-4\. CI/CD implemented using GitHub Actions
-
-5\. Docker used for containerization
+An advanced healthcare AI platform that combines:
 
 
 
-\## LLMOps Components
+\- 🧠 Machine Learning risk prediction
 
-\- Prompt Engineering
+\- 🤖 Large Language Model clinical reasoning
 
-\- Secure API key handling using environment variables
+\- 📊 Analytics dashboard \& monitoring
 
-\- ML + LLM orchestration
+\- 📄 PDF report generation
 
-\- Automated CI pipeline on push
+\- 💬 Medical-only AI assistant with memory
 
-\- Docker image build automation
+\- 🔒 Rate limiting \& validation
 
-
-
-\## Deployment
-
-Local deployment via Streamlit.
+\- ⚙ LLMOps architecture \& CI/CD deployment
 
 
 
-\## Security
+Deployed on \*\*Streamlit Cloud\*\*.
 
-API keys are managed using environment variables and never committed to source control.
+
+
+---
+
+
+
+\## 🌍 Live Demo
+
+
+
+👉 \[https://heartfailureproject-llmops.streamlit.app/]
+
+
+
+---
+
+
+
+\## 🏥 Project Overview
+
+
+
+This platform predicts the \*\*risk of heart failure\*\* using a trained ML model and enhances the prediction with:
+
+
+
+\- Structured LLM explanation
+
+\- Doctor / Patient explanation modes
+
+\- Confidence calibration layer
+
+\- What-if simulation
+
+\- Real-time analytics dashboard
+
+
+
+The system demonstrates \*\*LLMOps best practices\*\* including:
+
+
+
+\- Prompt versioning
+
+\- Model version tracking
+
+\- Logging \& monitoring
+
+\- Cloud deployment
+
+\- CI/CD via GitHub Actions
+
+\- API key security via environment variables
+
+
+
+---
+
+
+
+\## 🧠 System Architecture
+
+
 
