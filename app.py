@@ -4,7 +4,7 @@ import numpy as np
 import os
 from groq import Groq
 
-# Load ML model
+# Load ML model and scaler
 model = joblib.load("heart_failure_model.pkl")
 scaler = joblib.load("scaler.pkl")
 
@@ -15,7 +15,7 @@ st.title("Heart Failure Prediction with AI Clinical Explanation")
 
 st.write("Enter Patient Details")
 
-# Inputs
+# User Inputs
 Age = st.number_input("Age", 1, 120)
 Sex = st.number_input("Sex (0 = Female, 1 = Male)", 0, 1)
 ChestPainType = st.number_input("Chest Pain Type (encoded value)", 0, 3)
@@ -30,12 +30,17 @@ ST_Slope = st.number_input("ST Slope (encoded value)", 0, 2)
 
 if st.button("Predict"):
 
+    # Prepare input
     features = np.array([[Age, Sex, ChestPainType, RestingBP,
                           Cholesterol, FastingBS, RestingECG,
                           MaxHR, ExerciseAngina, Oldpeak, ST_Slope]])
 
     features_scaled = scaler.transform(features)
+
+    # ML Prediction
     prediction = model.predict(features_scaled)
+    probability = model.predict_proba(features_scaled)[0][1]
+    confidence_percentage = probability * 100
 
     if prediction[0] == 1:
         risk_text = "High Risk of Heart Failure"
@@ -44,7 +49,10 @@ if st.button("Predict"):
         risk_text = "Low Risk of Heart Failure"
         st.success(risk_text)
 
-    # Create prompt for LLM explanation
+    # Show confidence
+    st.write(f"Model Confidence: {confidence_percentage:.2f}%")
+
+    # Prompt for LLM
     prompt = f"""
     A patient has the following medical details:
     Age: {Age}
@@ -53,7 +61,8 @@ if st.button("Predict"):
     Maximum Heart Rate: {MaxHR}
     Exercise Angina: {ExerciseAngina}
 
-    The machine learning model predicted: {risk_text}.
+    The machine learning model predicted: {risk_text}
+    with a confidence of {confidence_percentage:.2f}%.
 
     Explain in simple medical language why this risk level may occur.
     """
@@ -70,4 +79,4 @@ if st.button("Predict"):
         st.write(explanation)
 
     except Exception as e:
-        st.error(str(e))
+        st.error(f"LLM Error: {str(e)}")
